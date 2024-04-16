@@ -344,6 +344,7 @@ class EddyDriftCompensation:
         self.name = config.get_name()
         self.drift_calibration = None
         self.calibration_samples = None
+        self.scale = config.getfloat("drift_adjust_factor", 1., minval=0.)
         self.dc_min_temp = config.getfloat("drift_calibration_min_temp", 0.)
         dc = config.getlists(
             "drift_calibration", None, seps=(',', '\n'), parser=float
@@ -382,7 +383,8 @@ class EddyDriftCompensation:
                 % (self.name,)
             )
 
-        temp_section = "temperature_probe " + self.name.split(maxsplit=1)[-1]
+        short_name = self.name.split(maxsplit=1)[-1]
+        temp_section = "temperature_probe " + short_name
         self.temp_sensor = None
         if config.has_section(temp_section):
             self.temp_sensor = self.printer.load_object(
@@ -396,6 +398,14 @@ class EddyDriftCompensation:
                 "disabling temperature compensation"
                 % (self.name, temp_section)
             )
+
+        # Register Gcode Command
+        gcode = self.printer.lookup_object('gcode')
+        gcode.register_mux_command(
+            "SET_PROBE_DRIFT_ADJ_FACTOR", "PROBE",
+            short_name, self.cmd_SET_DRIFT_FACTOR,
+            desc=self.cmd_SET_DRIFT_FACTOR_help
+        )
 
     def is_enabled(self):
         return self.enabled
@@ -548,11 +558,12 @@ class EddyDriftCompensation:
             if freq >= low_freq:
                 if high_freq is None:
                     # Freqency above max calibration value
-                    return dc[0](dest_temp)
+                    return freq + ((dc[0](dest_temp) - freq) * self.scale)
                 t = min(1., max(0., (freq - low_freq) / (high_freq - low_freq)))
                 low_tgt_freq = poly(dest_temp)
                 high_tgt_freq = dc[pos-1](dest_temp)
-                return (1 - t) * low_tgt_freq + t * high_tgt_freq
+                err = ((1 - t) * low_tgt_freq + t * high_tgt_freq) - freq
+                return freq + err * self.scale
         # Frequency below minimum, no correction
         return freq
 
@@ -560,6 +571,12 @@ class EddyDriftCompensation:
         if self.temp_sensor is not None:
             return self.temp_sensor.get_temp()[0]
         return 0.
+
+    cmd_SET_DRIFT_FACTOR_help = (
+        "Set adjustment factor applied to drift correction"
+    )
+    def cmd_SET_DRIFT_FACTOR(self, gcmd):
+        self.scale = gcmd.get_float("FACTOR", minval=0.)
 
 class StreamingContext:
     def __init__(self, scanning_probe, callback):
