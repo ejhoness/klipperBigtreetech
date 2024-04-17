@@ -19,6 +19,18 @@ class TemperatureProbe:
             "horizontal_move_z", 2., above=0.
         )
         self.resting_z = config.getfloat("resting_z", .4, above=0.)
+        self.cal_pos = config.getfloatlist(
+            "calibration_position", None, count=3
+        )
+        self.cal_bed_temp = config.getfloat(
+            "calibration_bed_temp", None, above=50.
+        )
+        self.cal_extruder_temp = config.getfloat(
+            "calibration_extruder_temp", None, above=50.
+        )
+        self.cal_extruder_z = config.getfloat(
+            "extruder_heating_z", 50., above=0.
+        )
         # Setup temperature sensor
         smooth_time = config.getfloat("smooth_time", 2., above=0.)
         self.inv_smooth_time = 1. / smooth_time
@@ -41,8 +53,6 @@ class TemperatureProbe:
 
         # Calibration State
         self.cal_helper = None
-        self.lift_speed = 5.
-        self.probe_speed = 5.
         self.next_auto_temp = 99999999.
         self.target_temp = 0
         self.expected_count = 0
@@ -88,16 +98,16 @@ class TemperatureProbe:
     def _collect_sample(self, kin_pos, tool_zero_z):
         probe = self._get_probe()
         x_offset, y_offset, _ = probe.get_offsets()
+        speeds = self._get_speeds()
+        lift_speed, _, move_speed = speeds
         toolhead = self.printer.lookup_object("toolhead")
         cur_pos = toolhead.get_position()
         # Move to probe to sample collection position
         cur_pos[2] += self.horizontal_move_z
-        toolhead.manual_move(cur_pos, self.lift_speed)
+        toolhead.manual_move(cur_pos, lift_speed)
         cur_pos[0] -= x_offset
         cur_pos[1] -= y_offset
-        move_speed = self.speed or self.probe_speed
         toolhead.manual_move(cur_pos, move_speed)
-        speeds = (self.lift_speed, self.probe_speed, move_speed)
         return self.cal_helper.collect_sample(kin_pos, tool_zero_z, speeds)
 
     def _prepare_next_sample(self, last_temp, tool_zero_z):
@@ -107,11 +117,12 @@ class TemperatureProbe:
             "ABORT", self.cmd_PROBE_DRIFT_ABORT,
             desc=self.cmd_PROBE_DRIFT_ABORT_help
         )
+        probe_speed = self._get_speeds()[1]
         # Move tool down to the resting position
         toolhead = self.printer.lookup_object("toolhead")
         cur_pos = toolhead.get_position()
         cur_pos[2] = tool_zero_z + self.resting_z
-        toolhead.manual_move(cur_pos, self.probe_speed)
+        toolhead.manual_move(cur_pos, probe_speed)
         cnt, exp_cnt = self.sample_count, self.expected_count
         self.next_auto_temp = last_temp + self.step
         self.gcode.respond_info(
@@ -147,6 +158,8 @@ class TemperatureProbe:
         else:
             try:
                 self._prepare_next_sample(last_temp, tool_zero_z)
+                if self.sample_count == 1:
+                    self._set_bed_temp(self.cal_bed_temp)
             except Exception:
                 self._finalize_drift_cal(False)
                 raise
@@ -165,6 +178,9 @@ class TemperatureProbe:
         self.gcode.register_command("ABORT", None)
         self.gcode.register_command("PROBE_DRIFT_NEXT", None)
         self.gcode.register_command("PROBE_DRIFT_COMPLETE", None)
+        # Turn off heaters
+        self._set_extruder_temp(0)
+        self._set_bed_temp(0)
         try:
             self.cal_helper.finish_calibration(success)
         except self.gcode.error as e:
@@ -180,6 +196,65 @@ class TemperatureProbe:
             raise self.gcode.error("No probe configured")
         return probe
 
+    def _set_extruder_temp(self, temp, wait=False):
+        if self.cal_extruder_temp is None:
+            # Extruder temperature not configured
+            return
+        toolhead = self.printer.lookup_object("toolhead")
+        extr_name = toolhead.get_extruder().get_name()
+        self.gcode.run_script_from_command(
+            "SET_HEATER_TEMPERATURE HEATER=%s TARGET=%f"
+            % (extr_name, temp)
+        )
+        if wait:
+            self.gcode.run_script_from_command(
+                "TEMPERATURE_WAIT SENSOR=%s MINIMUM=%f"
+                % (extr_name, temp)
+            )
+    def _set_bed_temp(self, temp):
+        if self.cal_bed_temp is None:
+            # Bed temperature not configured
+            return
+        self.gcode.run_script_from_command(
+            "SET_HEATER_TEMPERATURE HEATER=heater_bed TARGET=%f"
+            % (temp,)
+        )
+
+    def _check_homed(self):
+        toolhead = self.printer.lookup_object("toolhead")
+        reactor = self.printer.get_reactor()
+        status = toolhead.get_status(reactor.monotonic())
+        h_axes = status["homed_axes"]
+        for axis in "xyz":
+            if axis not in h_axes:
+                raise self.gcode.error(
+                    "Printer must be homed before calibration"
+                )
+
+    def _move_to_start(self):
+        toolhead = self.printer.lookup_object("toolhead")
+        cur_pos = toolhead.get_position()
+        move_speed = self._get_speeds()[2]
+        if self.cal_pos is not None:
+            if self.cal_extruder_temp is not None:
+                # Move to extruder heating z position
+                cur_pos[2] = self.cal_extruder_z
+                toolhead.manual_move(cur_pos, move_speed)
+            toolhead.manual_move(self.cal_pos[:2], move_speed)
+            self._set_extruder_temp(self.cal_extruder_temp, True)
+            toolhead.manual_move(self.cal_pos, move_speed)
+        elif self.cal_extruder_temp is not None:
+            cur_pos[2] = self.cal_extruder_z
+            toolhead.manual_move(cur_pos, move_speed)
+            self._set_extruder_temp(self.cal_extruder_temp, True)
+
+    def _get_speeds(self):
+        probe = self._get_probe()
+        probe_speed = probe.get_probe_speed()
+        lift_speed = probe.get_lift_speed()
+        move_speed = self.speed or max(probe_speed, lift_speed)
+        return lift_speed, probe_speed, move_speed
+
     cmd_PROBE_DRIFT_CALIBRATE_help = (
         "Calibrate probe temperature drift compensation"
     )
@@ -189,6 +264,7 @@ class TemperatureProbe:
                 "No calibration helper registered for [%s]"
                 % (self.name,)
             )
+        self._check_homed()
         probe = self._get_probe()
         probe_name = probe.get_probe_name().split(maxsplit=1)[-1]
         short_name = self.name.split(maxsplit=1)[-1]
@@ -207,7 +283,7 @@ class TemperatureProbe:
         target_temp = gcmd.get_float("TARGET", above=cur_temp)
         step = gcmd.get_float("STEP", 2., minval=1.0)
         expected_count = int(
-            (target_temp - cur_temp) / self.step + .5
+            (target_temp - cur_temp) / step + .5
         )
         if expected_count < 3:
             raise gcmd.error(
@@ -235,11 +311,15 @@ class TemperatureProbe:
         self.step = step
         self.sample_count = 0
         self.expected_count = expected_count
+        # If configured move to heating position and turn on extruder
+        try:
+            self._move_to_start()
+        except Exception:
+            self._finalize_drift_cal(False, "Error during initial move")
+            raise
         # Caputure start position and begin initial probe
         toolhead = self.printer.lookup_object("toolhead")
         self.start_pos = toolhead.get_position()[:2]
-        self.lift_speed = probe.get_lift_speed(gcmd)
-        self.probe_speed = probe.get_probe_speed(gcmd)
         manual_probe.ManualProbeHelper(
             self.printer, gcmd, self._manual_probe_finalize
         )
@@ -252,15 +332,15 @@ class TemperatureProbe:
         # Lift and Move to nozzle back to start position
         curpos = toolhead.get_position()
         start_z = curpos[2]
-        move_speed = self.speed or self.probe_speed
+        lift_speed, probe_speed, move_speed = self._get_speeds()
         # Move nozzle to the manual probing position
         curpos[2] += self.horizontal_move_z
-        toolhead.manual_move(curpos, self.lift_speed)
+        toolhead.manual_move(curpos, lift_speed)
         curpos[0] = self.start_pos[0]
         curpos[1] = self.start_pos[1]
         toolhead.manual_move(curpos, move_speed)
         curpos[2] = start_z
-        toolhead.manual_move(curpos, self.probe_speed)
+        toolhead.manual_move(curpos, probe_speed)
         self.gcode.register_command("ABORT", None)
         manual_probe.ManualProbeHelper(
             self.printer, gcmd, self._manual_probe_finalize
