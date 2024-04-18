@@ -70,6 +70,11 @@ class TemperatureProbe:
             self.cmd_PROBE_DRIFT_CALIBRATE,
             desc=self.cmd_PROBE_DRIFT_CALIBRATE_help
         )
+        self.gcode.register_mux_command(
+            "PROBE_DRIFT_MEASURE", "PROBE", pname,
+            self.cmd_PROBE_DRIFT_MEASURE,
+            desc=self.cmd_PROBE_DRIFT_MEASURE_help
+        )
 
     def register_calibration_helper(self, helper):
         self.cal_helper = helper
@@ -354,6 +359,60 @@ class TemperatureProbe:
     cmd_PROBE_DRIFT_ABORT_help = "Abort Probe Drift Calibration"
     def cmd_PROBE_DRIFT_ABORT(self, gcmd):
         self._finalize_drift_cal(False)
+
+    cmd_PROBE_DRIFT_MEASURE_help = "Measure distance to bed after probing"
+    def cmd_PROBE_DRIFT_MEASURE(self, gcmd):
+        # TODO: Automate mulitple probes
+        manual_probe.verify_no_manual_probe(self.printer)
+        if self.in_calibration:
+            raise gcmd.error(
+                "Cannot run PROBE_DRIFT_MEASURE while in calibration."
+            )
+        probe = self._get_probe()
+        toolhead = self.printer.lookup_object("toolhead")
+        lift_speed, probe_speed, move_speed = self._get_speeds()
+        x_offset, y_offset, _ = probe.get_offsets()
+        cur_pos = toolhead.get_position()
+        cur_pos[2] += self.horizontal_move_z
+        toolhead.manual_move(cur_pos, move_speed)
+        probe.run_probe(gcmd)
+        self.last_zero_pos = toolhead.get_position()
+        cur_pos = list(self.last_zero_pos)
+        cur_pos[2] += self.horizontal_move_z
+        toolhead.manual_move(cur_pos, lift_speed)
+        cur_pos[0] += x_offset
+        cur_pos[1] += y_offset
+        toolhead.manual_move(cur_pos, move_speed)
+        cur_pos[2] -= self.horizontal_move_z
+        toolhead.manual_move(cur_pos, probe_speed)
+        manual_probe.ManualProbeHelper(
+            self.printer, gcmd, self._probe_measure_finalize
+        )
+
+    def _probe_measure_finalize(self, kin_pos):
+        last_pos = self.last_zero_pos
+        self.last_zero_pos = None
+        if kin_pos is None:
+            # Probe Measure Aborted
+            return
+        toolhead = self.printer.lookup_object("toolhead")
+        cur_pos = toolhead.get_position()
+        final_z = cur_pos[2] + self.resting_z
+        moved_z = last_pos[2] - cur_pos[2]
+        self.gcode.respond_info(
+            "%s: Measured Z dist from probe: %.6f, Coil Temperature: %.2f"
+            % (self.name, moved_z, self.smoothed_temp)
+        )
+        probe = self._get_probe()
+        x_offset, y_offset, _ = probe.get_offsets()
+        lift_speed, probe_speed, move_speed = self._get_speeds()
+        cur_pos[2] += self.horizontal_move_z
+        toolhead.manual_move(cur_pos, lift_speed)
+        cur_pos[0] -= x_offset
+        cur_pos[1] -= y_offset
+        toolhead.manual_move(cur_pos, move_speed)
+        cur_pos[2] = final_z
+        toolhead.manual_move(cur_pos, probe_speed)
 
     def is_in_calibration(self):
         return self.in_calibration
