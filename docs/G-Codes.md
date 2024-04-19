@@ -1024,6 +1024,13 @@ appropriate DRIVE_CURRENT for the sensor. After running this command
 use the SAVE_CONFIG command to store that new setting in the
 printer.cfg config file.
 
+#### SET_PROBE_DRIFT_ADJ_FACTOR
+`SET_PROBE_DRIFT_ADJ_FACTOR PROBE=<config_name> FACTOR=<new_factor>`:
+When thermal drift compensation is calibrated this command may be
+used to set the `drift_adj_factor` during runtime.  This value
+is a multiplier applied to the calculated drift compensation and may be
+used to fine tune the result.
+
 ### [pwm_cycle_time]
 
 The following command is available when a
