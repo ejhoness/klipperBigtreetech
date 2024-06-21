@@ -312,6 +312,7 @@ class EddyDescend:
         self._param_helper = param_helper
         self._z_min_position = probe.lookup_minimum_z(config)
         self._z_offset = config.getfloat('z_offset', minval=0.)
+        self.position_endstop = config.getfloat('position_endstop', minval=0.)
         self._dispatch = mcu.TriggerDispatch(self._mcu)
         self._trigger_time = 0.
         self._gather = None
@@ -322,7 +323,7 @@ class EddyDescend:
     def home_start(self, print_time, sample_time, sample_count, rest_time,
                    triggered=True):
         self._trigger_time = 0.
-        trigger_freq = self._calibration.height_to_freq(self._z_offset)
+        trigger_freq = self._calibration.height_to_freq(self.position_endstop)
         trigger_completion = self._dispatch.start(print_time)
         self._sensor_helper.setup_home(
             print_time, trigger_freq, self._dispatch.get_oid(),
