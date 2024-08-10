@@ -191,6 +191,14 @@ class EddyCalibration:
     cmd_EDDY_CALIBRATE_help = "Calibrate eddy current probe"
     def cmd_EDDY_CALIBRATE(self, gcmd):
         self.probe_speed = gcmd.get_float("PROBE_SPEED", 5., above=0.)
+        toolhead = self.printer.lookup_object('toolhead')
+        curtime = self.printer.get_reactor().monotonic()
+        if 'xy' not in toolhead.get_status(curtime)['homed_axes']:
+            raise self.printer.command_error("Must home X and Y before probe")
+        if 'z' not in toolhead.get_status(curtime)['homed_axes']:
+            pos = toolhead.get_position()
+            pos[2] = toolhead.get_status(curtime)["axis_maximum"][2]
+            toolhead.set_position(pos, homing_axes=[2])
         # Start manual probe
         manual_probe.ManualProbeHelper(self.printer, gcmd,
                                        self.post_manual_probe)
