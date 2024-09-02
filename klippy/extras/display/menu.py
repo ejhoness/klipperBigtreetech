@@ -196,6 +196,7 @@ class MenuElement(object):
             return self._scripts[name](self, context)
         # check static string
         elif isinstance(self._scripts[name], str):
+            self.manager.exit() #ADDED BY MENSON
             return self._scripts[name]
 
     def run_script(self, name, **kwargs):
@@ -667,18 +668,31 @@ class MenuVSDList(MenuList):
         super(MenuVSDList, self)._populate()
         sdcard = self.manager.printer.lookup_object('virtual_sdcard', None)
         if sdcard is not None:
-            files = sdcard.get_file_list()
+            files = sdcard.get_file_list(path = "system")
             for fname, fsize in files:
                 self.insert_item(self.manager.menuitem_from(
-                    'command', name=repr(fname), gcode='M23 /%s' % str(fname)))
+                    'command', name=repr(fname), gcode='M23 /%s\r\nM24' % str(fname)))
 
+class MenuUSBList(MenuList):
+    def __init__(self, manager, config, **kwargs):
+        super(MenuUSBList, self).__init__(manager, config, **kwargs)
+
+    def _populate(self):
+        super(MenuUSBList, self)._populate()
+        sdcard = self.manager.printer.lookup_object('virtual_sdcard', None)
+        if sdcard is not None:
+            files = sdcard.get_file_list(path = "/USB")
+            for fname, fsize in files:
+                self.insert_item(self.manager.menuitem_from(
+                    'command', name=repr(fname), gcode='M23 /%s\r\nM24' % str(fname)))
 
 menu_items = {
     'disabled': MenuDisabled,
     'command': MenuCommand,
     'input': MenuInput,
     'list': MenuList,
-    'vsdlist': MenuVSDList
+    'vsdlist': MenuVSDList,
+    'usblist': MenuUSBList
 }
 
 
