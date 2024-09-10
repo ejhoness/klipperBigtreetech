@@ -42,7 +42,8 @@ DECL_ENUMERATION("spi_bus", "spi0c", 2);
 DECL_CONSTANT_STR("BUS_PINS_spi0c", "gpio16,gpio19,gpio18");
 DECL_ENUMERATION("spi_bus", "spi0d", 3);
 DECL_CONSTANT_STR("BUS_PINS_spi0d", "gpio20,gpio23,gpio22");
-
+DECL_ENUMERATION("spi_bus", "spi0e", 4);
+DECL_CONSTANT_STR("BUS_PINS_spi0e", "gpio4,gpio3,gpio2");
 DECL_ENUMERATION("spi_bus", "spi1a", 5);
 DECL_CONSTANT_STR("BUS_PINS_spi1a", "gpio8,gpio11,gpio10");
 DECL_ENUMERATION("spi_bus", "spi1b", 6);
