@@ -41,7 +41,7 @@ static const struct spi_info spi_bus[] = {
     {spi0_hw, 4,  7,  6,  RESETS_RESET_SPI0_BITS},
     {spi0_hw, 16, 19, 18, RESETS_RESET_SPI0_BITS},
     {spi0_hw, 20, 23, 22, RESETS_RESET_SPI0_BITS},
-    {spi0_hw, 4, 3, 2, RESETS_RESET_SPI0_BITS},
+    {spi0_hw, 4,  3,  2,  RESETS_RESET_SPI0_BITS},
 
     {spi1_hw, 8,  11, 10, RESETS_RESET_SPI1_BITS},
     {spi1_hw, 12, 15, 14, RESETS_RESET_SPI1_BITS},
