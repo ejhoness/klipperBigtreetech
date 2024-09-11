@@ -67,8 +67,8 @@ class VirtualSD:
     def get_file_list(self, check_subdirs=False, path=""):
         global sdcard_path_backup
         global subdir_path
-        
-        if path == "system":    
+
+        if path == "system":
             subdir_path = ""
             self.sdcard_dirname = sdcard_path_backup + subdir_path
         elif path != "":
@@ -77,9 +77,9 @@ class VirtualSD:
                 self.sdcard_dirname = sdcard_path_backup + subdir_path
             else:
                 return []
-            
-        
-        
+
+
+
         if check_subdirs:
             flist = []
             for root, dirs, files in os.walk(
@@ -93,7 +93,7 @@ class VirtualSD:
                     size = os.path.getsize(full_path)
                     flist.append((r_path, size))
             return sorted(flist, key=lambda f: f[0].lower())
-        else:            
+        else:
             dname = self.sdcard_dirname
             try:
                 filenames = os.listdir(self.sdcard_dirname)
@@ -196,8 +196,9 @@ class VirtualSD:
             if os.path.exists(cache_path):
                 shutil.rmtree(cache_path)
             os.makedirs(cache_path)
-            self.copy_file_to_cache(os.path.join(self.sdcard_dirname, filename), os.path.join(base_path, target), gcmd)
-            filename = target
+            self.copy_file_to_cache(os.path.join(self.sdcard_dirname, filename)
+                , os.path.join(base_path, target), gcmd)
+        filename = target
         self._load_file(gcmd, filename, True)
     def copy_file_to_cache(self, origin, target, gcmd):
         stat = os.statvfs("/")
