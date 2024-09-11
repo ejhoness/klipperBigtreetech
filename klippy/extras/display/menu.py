@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Basic LCD menu support
 #
-# Copyright (C) 2020  Janar S””t <janar.soot@gmail.com>
+# Copyright (C) 2020  Janar Soot <janar.soot@gmail.com>
 #
 # This file may be distributed under the terms of the GNU GPLv3 license.
 import os, logging, ast, re
