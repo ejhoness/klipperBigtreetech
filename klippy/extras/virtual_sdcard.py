@@ -207,7 +207,8 @@ class VirtualSD:
         if (filesize < free_space - 50 * 1024 * 1024):
             shutil.copy(origin, target)
         else:
-            raise gcmd.error("Insufficient disk space, unable to load the file.")
+            raise gcmd.error
+            ("Insufficient disk space, unable to load the file.")
     def _load_file(self, gcmd, filename, check_subdirs=False):
         global sdcard_path_backup
         files = self.get_file_list(check_subdirs, "system")
