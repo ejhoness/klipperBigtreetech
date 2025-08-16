@@ -58,8 +58,8 @@ BOARD_DEFS = {
         'cs_pin': "PC11",
         'skip_verify': True,
         "conversion_script": "scripts/update_mks_robin.py",
-        "firmware_path": "ROBIN_NANO35.BIN",
-        "current_firmware_path": "ROBIN_NANO35.BIN"
+        "firmware_path": "Robin_nano35.bin",
+        "current_firmware_path": "Robin_nano35.bin"
     },
     'btt-octopus-f407-v1': {
         'mcu': "stm32f407xx",
