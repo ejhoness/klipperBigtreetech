@@ -9,8 +9,9 @@ from . import bus
 ######################################################################
 # Compatible Sensors:
 #       AHT10      -    Tested w/ BTT GTR 1.0 MCU on i2c3
-#       AHT20      -    Untested but should work
+#       AHT20      -  change `INIT`to :[0xBE, 0x08, 0x00], Untested but should work, tnks :D
 #       AHT21      -    Tested w/ BTT GTR 1.0 MCU on i2c3
+  #    tnks.   to ath20 'INIT'              :[0xBE, 0x08, 0x00],
 ######################################################################
 
 AHT10_I2C_ADDR= 0x38
