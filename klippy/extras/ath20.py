@@ -11,7 +11,7 @@ from . import bus
 #       AHT10      -    Tested w/ BTT GTR 1.0 MCU on i2c3
 #       AHT20      -    Untested but should work, tnks :D
 #       AHT21      -    Tested w/ BTT GTR 1.0 MCU on i2c3
-# to ath20 'INIT' :[0xBE, 0x08, 0x00], maybe with this and filename.
+# to ath20 'INIT' :[0xBE, 0x08, 0x00], and this and filename.
 ######################################################################
 
 AHT10_I2C_ADDR= 0x38
