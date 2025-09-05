@@ -56,6 +56,8 @@ defs_stepcompress = """
         , uint64_t start_clock, uint64_t end_clock);
     void stepcompress_set_stepper_kinematics(struct stepcompress *sc
         , struct stepper_kinematics *sk);
+    struct stepper_kinematics *stepcompress_get_stepper_kinematics(
+        struct stepcompress *sc);
 """
 
 defs_steppersync = """
@@ -76,11 +78,14 @@ defs_itersolve = """
     int32_t itersolve_is_active_axis(struct stepper_kinematics *sk, char axis);
     void itersolve_set_trapq(struct stepper_kinematics *sk, struct trapq *tq
         , double step_dist);
+    struct trapq *itersolve_get_trapq(struct stepper_kinematics *sk);
     double itersolve_calc_position_from_coord(struct stepper_kinematics *sk
         , double x, double y, double z);
     void itersolve_set_position(struct stepper_kinematics *sk
         , double x, double y, double z);
     double itersolve_get_commanded_pos(struct stepper_kinematics *sk);
+    double itersolve_get_gen_steps_pre_active(struct stepper_kinematics *sk);
+    double itersolve_get_gen_steps_post_active(struct stepper_kinematics *sk);
 """
 
 defs_trapq = """
@@ -157,8 +162,6 @@ defs_kin_extruder = """
 """
 
 defs_kin_shaper = """
-    double input_shaper_get_step_generation_window(
-        struct stepper_kinematics *sk);
     int input_shaper_set_shaper_params(struct stepper_kinematics *sk, char axis
         , int n, double a[], double t[]);
     int input_shaper_set_sk(struct stepper_kinematics *sk
@@ -274,6 +277,28 @@ def do_build_code(cmd):
         logging.error(msg)
         raise Exception(msg)
 
+# Build the main c_helper.so c code library
+def check_build_c_library():
+    srcdir = os.path.dirname(os.path.realpath(__file__))
+    srcfiles = get_abs_files(srcdir, SOURCE_FILES)
+    ofiles = get_abs_files(srcdir, OTHER_FILES)
+    destlib = get_abs_files(srcdir, [DEST_LIB])[0]
+    if not check_build_code(srcfiles+ofiles+[__file__], destlib):
+        # Code already built
+        return destlib
+    # Select command line options
+    if check_gcc_option(SSE_FLAGS):
+        cmd = "%s %s %s" % (GCC_CMD, SSE_FLAGS, COMPILE_ARGS)
+    else:
+        cmd = "%s %s" % (GCC_CMD, COMPILE_ARGS)
+    # Invoke compiler
+    logging.info("Building C code module %s", DEST_LIB)
+    tempdestlib = get_abs_files(srcdir, ["_temp_" + DEST_LIB])[0]
+    do_build_code(cmd % (tempdestlib, ' '.join(srcfiles)))
+    # Rename from temporary file to final file name
+    os.rename(tempdestlib, destlib)
+    return destlib
+
 FFI_main = None
 FFI_lib = None
 pyhelper_logging_callback = None
@@ -286,17 +311,9 @@ def logging_callback(msg):
 def get_ffi():
     global FFI_main, FFI_lib, pyhelper_logging_callback
     if FFI_lib is None:
-        srcdir = os.path.dirname(os.path.realpath(__file__))
-        srcfiles = get_abs_files(srcdir, SOURCE_FILES)
-        ofiles = get_abs_files(srcdir, OTHER_FILES)
-        destlib = get_abs_files(srcdir, [DEST_LIB])[0]
-        if check_build_code(srcfiles+ofiles+[__file__], destlib):
-            if check_gcc_option(SSE_FLAGS):
-                cmd = "%s %s %s" % (GCC_CMD, SSE_FLAGS, COMPILE_ARGS)
-            else:
-                cmd = "%s %s" % (GCC_CMD, COMPILE_ARGS)
-            logging.info("Building C code module %s", DEST_LIB)
-            do_build_code(cmd % (destlib, ' '.join(srcfiles)))
+        # Check if library needs to be built, and build if so
+        destlib = check_build_c_library()
+        # Open library
         FFI_main = cffi.FFI()
         for d in defs_all:
             FFI_main.cdef(d)
