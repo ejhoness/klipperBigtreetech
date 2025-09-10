@@ -9,7 +9,7 @@ from . import bus
 ######################################################################
 # Compatible Sensors:
 #       AHT10      -    Tested w/ BTT GTR 1.0 MCU on i2c3
-#       AHT20      -    Untested but should work
+#       AHT20      -    Untested but should work tnks
 #       AHT21      -    Tested w/ BTT GTR 1.0 MCU on i2c3
 ######################################################################
 
